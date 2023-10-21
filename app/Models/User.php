@@ -2,15 +2,20 @@
 
 namespace App\Models;
 
+use App\Utilities\Contracts\ElasticsearchHelperInterface;
+use App\Utilities\Contracts\RedisHelperInterface;
+use Elasticsearch\ClientBuilder;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Elasticsearch;
+use Illuminate\Support\Facades\Redis;
 
 use App\Jobs\MotivateUser;
 
-class User extends Authenticatable
+class User extends Authenticatable implements ElasticsearchHelperInterface, RedisHelperInterface
 {
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -78,5 +83,26 @@ class User extends Authenticatable
         }
 
         return $greeting;
+    }
+
+    public function storeEmail(string $messageBody, string $messageSubject, string $toEmailAddress): mixed
+    {
+        $data = [
+            'body' => [
+                'body' => $messageBody,
+                'subject' => $messageSubject,
+                'email' => $toEmailAddress
+            ],
+            'index' => time(),
+            'user_id' => $this->id
+        ];
+        $return = Elasticsearch::index($data);
+        return  true;
+    }
+
+    public function storeRecentMessage(mixed $id, string $messageSubject, string $toEmailAddress): void
+    {
+        Redis::set($id, $messageSubject, $toEmailAddress);
+
     }
 }
